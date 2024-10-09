@@ -1,0 +1,97 @@
+
+x-default-opts: 
+  &default-opts
+  logging:
+    options:
+      max-size: "10m"
+      max-file: "10"
+  # driver: "gelf"
+  # options:
+  #   gelf-address: "udp://127.0.0.1:5000"
+
+name: "asistencia-dev"
+
+services:
+  builder:
+    build: ./images/builder
+    command:
+#     - /bin/sh
+#      - -c
+#      - |
+#        adduser dev --uid "$${ACTUAL_UID}" --gid "$${ACTUAL_GID}";
+#        su dev bash
+      - /bin/bash
+    tty: true
+    stdin_open: true
+    hostname: dev
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:9229:9229"
+      - "127.0.0.1:8080:8080"
+    environment:
+      TZ: 'Europe/Madrid'
+      ACTUAL_UID: ${UID?Missing var}
+      ACTUAL_GID: ${GID?Missing var}
+    volumes:
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+      - ${DEV_HOME?Missing var}:/app
+      - dev-home:/home/node
+      - dev-root-home:/root
+      - dev-node_modules:/usr/local/lib/node_modules
+
+  mysql-test:
+    image: mysql:8.4.2
+#    command: ['mysqld', '--default-time-zone=+00:00']
+    command: ['mysqld', '--default-time-zone=Europe/Madrid']
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: horarios
+      MYSQL_USER: userhorarios
+      MYSQL_PASSWORD: userpassword
+    cap_add:
+      - SYS_NICE  # https://stackoverflow.com/a/55706057
+    volumes:
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+      - type: tmpfs
+        target: /var/lib/mysql
+        tmpfs:
+          size: 1G
+# https://github.com/fradelg/docker-mysql-cron-backup
+#  mysql-backup:
+#    image: fradelg/docker-mysql-cron-backup
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.1-apache
+    environment:
+      PMA_HOST: mysql-test
+      PMA_USER: root
+      PMA_PASSWORD: rootpass
+    ports:
+      - "127.0.0.1:8090:80"
+
+volumes:
+  dev-root-home:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DEV_DOCKER?Missing var}/root-home
+  dev-home:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DEV_DOCKER?Missing var}/home
+  dev-node_modules:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DEV_DOCKER?Missing var}/node_modules
